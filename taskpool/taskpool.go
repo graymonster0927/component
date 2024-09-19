@@ -3,66 +3,68 @@ package taskpool
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/panjf2000/ants/v2"
 	"sync"
 	"time"
 )
 
-var GPool *ants.Pool
-var GPoolSize = 5000
-
+var gPool *ants.Pool
+var gPoolSize = 5000
 var once = sync.Once{}
 
-func GetGPoolInstance() *ants.Pool {
+func getGPoolInstance() (*ants.Pool, error) {
+	var err error
 	once.Do(func() {
-		GPool, _ = ants.NewPool(GPoolSize, ants.WithNonblocking(true),
+		gPool, err = ants.NewPool(gPoolSize, ants.WithNonblocking(true),
 			ants.WithExpiryDuration(time.Hour*24))
 	})
-	return GPool
+	return gPool, err
 }
 
 type TaskType int
 
-type Task struct {
-	Params   map[string]interface{}
-	TaskType TaskType
-	Label    string
+type task struct {
+	params   map[string]interface{}
+	taskType TaskType
+	label    string
 }
-
-type TaskPool struct {
+type taskPool struct {
 	taskCount int
 	fn        map[TaskType]func(ctx *context.Context, params map[string]interface{}) (interface{}, error)
 	ctx       *context.Context
-	taskList  []*Task
+	taskList  []*task
 	errList   map[string]error
 	retList   map[string]interface{}
 }
 
-func GetTaskPool(ctx *context.Context) *TaskPool {
-	return &TaskPool{
+func GetTaskPool(ctx *context.Context) *taskPool {
+	return &taskPool{
 		ctx:      ctx,
-		taskList: make([]*Task, 0, 8),
+		taskList: make([]*task, 0, 8),
 		errList:  make(map[string]error),
 		retList:  make(map[string]interface{}),
 		fn:       make(map[TaskType]func(ctx *context.Context, params map[string]interface{}) (interface{}, error)),
 	}
 }
 
-func (t *TaskPool) SetTaskHandler(taskType TaskType, fn func(ctx *context.Context, params map[string]interface{}) (interface{}, error)) {
+func (t *taskPool) SetGPoolSize(size int) {
+	gPoolSize = size
+}
+
+func (t *taskPool) SetTaskHandler(taskType TaskType, fn func(ctx *context.Context, params map[string]interface{}) (interface{}, error)) {
 	t.fn[taskType] = fn
 }
 
-func (t *TaskPool) AddTask(taskType TaskType, label string, params map[string]interface{}) {
-	t.taskList = append(t.taskList, &Task{
-		TaskType: taskType,
-		Label:    label,
-		Params:   params,
+func (t *taskPool) AddTask(taskType TaskType, label string, params map[string]interface{}) {
+	t.taskList = append(t.taskList, &task{
+		taskType: taskType,
+		label:    label,
+		params:   params,
 	})
 	t.taskCount++
 }
 
-func (t *TaskPool) Start() error {
+func (t *taskPool) Start() error {
 
 	if t.taskCount == 0 {
 		return errors.New("当前没有任务")
@@ -78,27 +80,33 @@ func (t *TaskPool) Start() error {
 	retCh := make(chan map[string]interface{}, t.taskCount)
 
 	for _, task := range t.taskList {
-		fn, ok := t.fn[task.TaskType]
+		fn, ok := t.fn[task.taskType]
 		if !ok {
-			errCh <- map[string]error{task.Label: errors.New("当前任务类型没有配置处理函数")}
+			errCh <- map[string]error{task.label: errors.New("当前任务类型没有配置处理函数")}
 			continue
 		}
 		wg.Add(1)
 		taskCopy := task
-		if err := GetGPoolInstance().Submit(func() {
+		gPool, err := getGPoolInstance()
+		if err != nil {
+			errCh <- map[string]error{task.label: err}
+			wg.Done()
+			continue
+		}
+
+		if err := gPool.Submit(func() {
 			defer func() {
 				if r := recover(); r != nil {
-					fmt.Println(t.ctx, "TaskPool Do Task Error", r)
-					errCh <- map[string]error{taskCopy.Label: errors.New("TaskPool Do Task Error")}
+					errCh <- map[string]error{taskCopy.label: errors.New("TaskPool Do Task Error")}
 				}
 				wg.Done()
 			}()
 
-			data, err := fn(t.ctx, taskCopy.Params)
-			errCh <- map[string]error{taskCopy.Label: err}
-			retCh <- map[string]interface{}{taskCopy.Label: data}
+			data, err := fn(t.ctx, taskCopy.params)
+			errCh <- map[string]error{taskCopy.label: err}
+			retCh <- map[string]interface{}{taskCopy.label: data}
 		}); err != nil {
-			errCh <- map[string]error{task.Label: err}
+			errCh <- map[string]error{task.label: err}
 			wg.Done()
 		}
 	}
@@ -124,17 +132,17 @@ func (t *TaskPool) Start() error {
 	return nil
 }
 
-func (t *TaskPool) GetRetList() map[string]interface{} {
+func (t *taskPool) GetRetList() map[string]interface{} {
 	return t.retList
 }
 
-func (t *TaskPool) GetErrList() map[string]error {
+func (t *taskPool) GetErrList() map[string]error {
 	return t.errList
 }
 
-func (t *TaskPool) Clear(ctx *context.Context) {
+func (t *taskPool) Clear(ctx *context.Context) {
 	t.ctx = ctx
-	t.taskList = make([]*Task, 0, 8)
+	t.taskList = make([]*task, 0, 8)
 	t.errList = make(map[string]error)
 	t.retList = make(map[string]interface{})
 }

@@ -1,15 +1,17 @@
-任务池
-
-场景对 多个需要同时执行,且需要等待结果的任务.
-比如 同一张图 -> 同时 校验A规则/校验B规则/校验C规则 -> 任一个规则失败则不允许图保存
+### 任务池
 
 1. 简化代码 统一封装
 2. 加入协程池 减少gc
 3. 任务限速(todo)
 
-使用方法如下:
 
+使用场景:
+
+* 并发执行多个任务, 且需要等待所有结果
+
+> 比如 同一张图 -> 同时 校验A规则/校验B规则/校验C规则 -> 任一个规则失败则不允许图保存
 ```
+
 const (
 	TaskTypeDemo1 TaskType = 1
 	TaskTypeDemo2 TaskType = 2
@@ -20,7 +22,8 @@ func main() {
 	//获取任务池
 	ctx := context.Background()
 	taskPool := GetTaskPool(&ctx)
-
+	//设置协程池大小
+    taskPool.SetGPoolSize(100)
 	//设置任务池的任务处理函数
 	taskPool.SetTaskHandler(TaskTypeDemo1, func(ctx *context.Context, params map[string]interface{}) (interface{}, error) {
 		fmt.Println("demo1")
@@ -60,4 +63,59 @@ func main() {
 	fmt.Println(taskPool.retList)
 
 }
+
+
+```
+
+* 限制并发执行任务数目
+
+> 比如限制一次只能执行500个扫描端口的任务 避免扫描端口过多导致NAT压力过大
+
+```
+
+const (
+	TaskTypeDemo3 TaskType = 3
+)
+
+func main() {
+	//获取任务池
+	ctx := context.Background()
+	taskPool := GetTaskPool(&ctx)
+
+	//设置任务池的任务处理函数
+	taskPool.SetTaskHandler(TaskTypeDemo3, func(ctx *context.Context, params map[string]interface{}) (interface{}, error) {
+		p1 := params["p1"].(int)
+		fmt.Println(p1+"port is scanning")
+		return nil, nil
+	})
+
+	//添加任务
+    for i := 0; i < 65535; i++ {
+        count++
+        params := map[string]interface{}{
+		    "p1": i,
+	    }
+        taskPool.AddTask(TaskTypeDemo3, "id-"+strconv.Itoa(i), params)
+        if count % 500 == 0 {
+            if err := taskPool.Start(); err != nil {
+                fmt.Println("task exception", err)
+                return
+            }
+            
+            //处理结果
+            taskPool.Clear()
+        }
+    }
+    
+    if count % 500 > 0 {
+        if err := taskPool.Start(); err != nil {
+            fmt.Println("task exception", err)
+            return
+        }
+        //处理结果
+        taskPool.Clear()
+    }
+
+}
+
 ```
