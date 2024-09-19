@@ -16,14 +16,14 @@ const (
 )
 
 type portScan struct {
-	ctx         *context.Context
+	ctx         context.Context
 	ipList      []string
 	openPortMap map[string][]int
 	concurrent  int
 	timeout     time.Duration
 }
 
-func NewPortScan(ctx *context.Context, ipList []string) *portScan {
+func NewPortScan(ctx context.Context, ipList []string) *portScan {
 	return &portScan{ctx: ctx, ipList: ipList, openPortMap: make(map[string][]int), concurrent: 500, timeout: 100 * time.Millisecond}
 }
 
@@ -37,7 +37,7 @@ func (p *portScan) SetTimeout(timeout time.Duration) {
 func (p *portScan) Scan() error {
 	taskPool := taskpool.GetTaskPool(p.ctx)
 	taskPool.SetGPoolSize(p.concurrent)
-	taskPool.SetTaskHandler(taskTypeScanEIPPort, func(ctx *context.Context, params map[string]interface{}) (interface{}, error) {
+	taskPool.SetTaskHandler(taskTypeScanEIPPort, func(ctx context.Context, params map[string]interface{}) (interface{}, error) {
 		ip := params["ip"].(string)
 		port := params["port"].(int)
 		return p.checkPortOpen(ip, port), nil

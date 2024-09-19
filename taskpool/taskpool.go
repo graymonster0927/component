@@ -30,20 +30,20 @@ type task struct {
 }
 type taskPool struct {
 	taskCount int
-	fn        map[TaskType]func(ctx *context.Context, params map[string]interface{}) (interface{}, error)
-	ctx       *context.Context
+	fn        map[TaskType]func(ctx context.Context, params map[string]interface{}) (interface{}, error)
+	ctx       context.Context
 	taskList  []*task
 	errList   map[string]error
 	retList   map[string]interface{}
 }
 
-func GetTaskPool(ctx *context.Context) *taskPool {
+func GetTaskPool(ctx context.Context) *taskPool {
 	return &taskPool{
 		ctx:      ctx,
 		taskList: make([]*task, 0, 8),
 		errList:  make(map[string]error),
 		retList:  make(map[string]interface{}),
-		fn:       make(map[TaskType]func(ctx *context.Context, params map[string]interface{}) (interface{}, error)),
+		fn:       make(map[TaskType]func(ctx context.Context, params map[string]interface{}) (interface{}, error)),
 	}
 }
 
@@ -51,7 +51,7 @@ func (t *taskPool) SetGPoolSize(size int) {
 	gPoolSize = size
 }
 
-func (t *taskPool) SetTaskHandler(taskType TaskType, fn func(ctx *context.Context, params map[string]interface{}) (interface{}, error)) {
+func (t *taskPool) SetTaskHandler(taskType TaskType, fn func(ctx context.Context, params map[string]interface{}) (interface{}, error)) {
 	t.fn[taskType] = fn
 }
 
@@ -140,7 +140,7 @@ func (t *taskPool) GetErrList() map[string]error {
 	return t.errList
 }
 
-func (t *taskPool) Clear(ctx *context.Context) {
+func (t *taskPool) Clear(ctx context.Context) {
 	t.ctx = ctx
 	t.taskList = make([]*task, 0, 8)
 	t.errList = make(map[string]error)
