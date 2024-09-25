@@ -27,42 +27,38 @@ const (
 	HandleErrStrategyBreak HandleErrStrategy = iota
 )
 
-type getCacheResult struct {
+type GetCacheResult struct {
 	Value string
 	Exist bool
 	helper.ErrHelper
 	HandleErrStrategy HandleErrStrategy
 }
 
-type setCacheResult struct {
+type SetCacheResult struct {
 	helper.ErrHelper
 	HandleErrStrategy HandleErrStrategy
 }
 
-type clearCacheResult struct {
+type ClearCacheResult struct {
 	helper.ErrHelper
 	HandleErrStrategy HandleErrStrategy
 }
 
 type CacheInterface interface {
-	GetFromCache(ctx context.Context, key string) getCacheResult
-	BatchGetFromCache(c context.Context, keyList []string) map[string]getCacheResult
-	SetCache(ctx context.Context, key string, val string) setCacheResult
-	BatchSetCache(ctx context.Context, keyList []string, valList []string) map[string]setCacheResult
-	ClearCache(ctx context.Context, key string) clearCacheResult
-	BatchClearCache(ctx context.Context, keyList []string) map[string]clearCacheResult
-	RetryGetFromCache(ctx context.Context, key string) getCacheResult
-	RetryBatchGetFromCache(ctx context.Context, keyList []string) map[string]getCacheResult
+	GetFromCache(ctx context.Context, key string) GetCacheResult
+	BatchGetFromCache(c context.Context, keyList []string) map[string]GetCacheResult
+	SetCache(ctx context.Context, key string, val string) SetCacheResult
+	BatchSetCache(ctx context.Context, keyList []string, valList []string) map[string]SetCacheResult
+	ClearCache(ctx context.Context, key string) ClearCacheResult
+	BatchClearCache(ctx context.Context, keyList []string) map[string]ClearCacheResult
+	RetryGetFromCache(ctx context.Context, key string) GetCacheResult
+	RetrySetCache(ctx context.Context, key string, val string) SetCacheResult
+	RetryClearCache(ctx context.Context, key string) ClearCacheResult
 	GetName() string
+	SetFnGetNoCache(fn func(c context.Context, key string) (string, error))
+	SetFnBatchGetNoCache(fn func(c context.Context, keyList []string) (map[string]string, error))
+	SetKeyPrefix(keyPrefix string)
 }
 
-//type CommonCacheOption struct {
-//	CacheExpire int
-//}
-//type option func(*CommonCacheOption)
-//
-//func (c *CommonCacheOption) WithExpireTime(expireTime int) option {
-//	return func(o *CommonCacheOption) {
-//		o.CacheExpire = expireTime
-//	}
-//}
+type ExtraSetParams interface {
+}

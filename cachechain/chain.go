@@ -2,6 +2,8 @@ package cachechain
 
 import (
 	"context"
+	"errors"
+	"github.com/graymonster0927/component"
 	"github.com/graymonster0927/component/cachechain/cache"
 	"github.com/graymonster0927/component/cachechain/cacheerr"
 	"github.com/graymonster0927/component/cachechain/helper"
@@ -37,8 +39,39 @@ func (c *chain) WithCache(cache cache.CacheInterface) {
 	c.cacheList = append(c.cacheList, cache)
 }
 
-func (c *chain) Get(ctx context.Context, key string, fnGetNoCache func(key string) (string, error)) GetResult {
-	ret := GetResult{}
+//func Test() {
+//	cacheHelper := NewCacheChain()
+//	redisCache := cache.NewRedisCache(cache.WithExpireTime(60), cache.WithTokenPrefix("zyb:security-manager:cachechain"))
+//	cacheHelper.WithCache(redisCache)
+//
+//	cacheHelper.SetKeyPrefix("")
+//	cacheHelper.SetFnGetNoCache("")
+//	cacheHelper.Get(context.Background(), "test")
+//
+//}
+
+func (c *chain) SetFnGetNoCache(fn func(c context.Context, key string) (string, error)) {
+	for _, c := range c.cacheList {
+		c.SetFnGetNoCache(fn)
+	}
+}
+
+func (c *chain) SetFnBatchGetNoCache(fn func(c context.Context, keyList []string) (map[string]string, error)) {
+	for _, c := range c.cacheList {
+		c.SetFnBatchGetNoCache(fn)
+	}
+}
+
+func (c *chain) SetKeyPrefix(keyPrefix string) {
+	for _, c := range c.cacheList {
+		c.SetKeyPrefix(keyPrefix)
+	}
+}
+
+func (c *chain) Get(ctx context.Context, key string) GetResult {
+	ret := GetResult{
+		Exist: false,
+	}
 
 	if len(c.cacheList) == 0 {
 		ret.Err = cacheerr.NoCacheSet
@@ -47,13 +80,16 @@ func (c *chain) Get(ctx context.Context, key string, fnGetNoCache func(key strin
 
 	for _, c := range c.cacheList {
 		getRet := c.GetFromCache(ctx, key)
+		ret.CacheName = c.GetName()
 		if getRet.IsSuccess() {
-			ret.CacheName = c.GetName()
-			ret.FromCache = true
-			ret.Exist = getRet.Exist
-			ret.V = getRet.Value
 			ret.Err = nil
+			ret.FromCache = true
+			ret.Exist = true
+			ret.V = getRet.Value
 			return ret
+		} else {
+			component.Logger.Errorf(ctx, "cache %s get failed, err: %v", c.GetName(), getRet.Err)
+			ret.Err = errors.Join(ret.Err, getRet.Err)
 		}
 
 		switch getRet.HandleErrStrategy {
@@ -75,31 +111,263 @@ func (c *chain) Get(ctx context.Context, key string, fnGetNoCache func(key strin
 		}
 	}
 
-	//到这里都没有拿到
-	v, err := fnGetNoCache(key)
-	ret.Err = err
-	ret.V = v
-	ret.Exist = ret.IsSuccess()
-	ret.FromCache = false
 	return ret
 }
 
-//func (c *chain) BatchGet(ctx context.Context, key string, fnGetNoCache func(keyList []string) (map[string]string, error)) map[string]GetResult {
-//
-//}
-//
-//func (c *chain) Set(ctx context.Context, key string, val string) SetResult {
-//
-//}
-//
-//func (c *chain) BatchSet(ctx context.Context, keyList []string, valList []string) map[string]SetResult {
-//
-//}
-//
-//func (c *chain) Clear(ctx context.Context, key string) ClearResult {
-//
-//}
-//
-//func (c *chain) BatchClear(ctx context.Context, keyList []string) map[string]ClearResult {
-//
-//}
+func (c *chain) BatchGet(ctx context.Context, keyList []string) map[string]GetResult {
+	ret := make(map[string]GetResult)
+
+	if len(c.cacheList) == 0 {
+		for _, key := range keyList {
+			ret[key] = GetResult{
+				ErrHelper: helper.ErrHelper{Err: cacheerr.NoCacheSet},
+			}
+		}
+		return ret
+	}
+
+	for _, c := range c.cacheList {
+		getRetMap := c.BatchGetFromCache(ctx, keyList)
+		keyList = make([]string, 0, len(keyList))
+		for key, getRet := range getRetMap {
+			if getRet.IsSuccess() {
+				ret[key] = GetResult{
+					CacheName: c.GetName(),
+					ErrHelper: helper.ErrHelper{Err: nil},
+					FromCache: true,
+					Exist:     getRet.Exist,
+					V:         getRet.Value,
+				}
+				continue
+			} else {
+				component.Logger.Errorf(ctx, "cache %s get failed, err: %v", c.GetName(), getRet.Err)
+				var preErr error
+				if _, ok := ret[key]; ok {
+					preErr = ret[key].Err
+				}
+				ret[key] = GetResult{
+					CacheName: c.GetName(),
+					ErrHelper: helper.ErrHelper{Err: errors.Join(preErr, getRet.Err)},
+					FromCache: false,
+					Exist:     false,
+					V:         "",
+				}
+			}
+
+			switch getRet.HandleErrStrategy {
+			case cache.HandleErrStrategyContinue:
+				keyList = append(keyList, key)
+			case cache.HandleErrStrategyBreak:
+				ret[key] = GetResult{
+					CacheName: c.GetName(),
+					ErrHelper: helper.ErrHelper{Err: getRet.Err},
+					FromCache: false,
+					Exist:     false,
+					V:         "",
+				}
+			case cache.HandleErrStrategyRetry:
+				getRet = c.RetryGetFromCache(ctx, key)
+				if getRet.IsSuccess() {
+					ret[key] = GetResult{
+						CacheName: c.GetName(),
+						ErrHelper: helper.ErrHelper{Err: nil},
+						FromCache: true,
+						Exist:     getRet.Exist,
+						V:         getRet.Value,
+					}
+					continue
+				}
+			}
+		}
+	}
+	return ret
+}
+
+func (c *chain) Set(ctx context.Context, key string, val string) SetResult {
+	ret := SetResult{}
+
+	if len(c.cacheList) == 0 {
+		ret.Err = cacheerr.NoCacheSet
+		return ret
+	}
+
+	for _, c := range c.cacheList {
+		setRet := c.SetCache(ctx, key, val)
+		if setRet.IsSuccess() {
+			continue
+		} else {
+			component.Logger.Errorf(ctx, "cache %s set failed, err: %v", c.GetName(), setRet.Err)
+		}
+
+		switch setRet.HandleErrStrategy {
+		case cache.HandleErrStrategyContinue:
+			continue
+		case cache.HandleErrStrategyBreak:
+			ret.Err = setRet.Err
+			return ret
+		case cache.HandleErrStrategyRetry:
+			setRet = c.RetrySetCache(ctx, key, val)
+			if setRet.IsSuccess() {
+				continue
+			} else {
+				ret.Err = setRet.Err
+				return ret
+			}
+		}
+	}
+
+	return ret
+
+}
+
+func (c *chain) BatchSet(ctx context.Context, keyList []string, valList []string) map[string]SetResult {
+	ret := make(map[string]SetResult)
+
+	if len(c.cacheList) == 0 {
+		for _, key := range keyList {
+			ret[key] = SetResult{
+				ErrHelper: helper.ErrHelper{Err: cacheerr.NoCacheSet},
+			}
+		}
+		return ret
+	}
+
+	//todo 批量数校验
+	vMap := make(map[string]string)
+	for i, key := range keyList {
+		vMap[key] = valList[i]
+	}
+
+	for _, c := range c.cacheList {
+		setRetMap := c.BatchSetCache(ctx, keyList, valList)
+		keyList = make([]string, 0, len(keyList))
+		for key, setRet := range setRetMap {
+			if setRet.IsSuccess() {
+				ret[key] = SetResult{
+					ErrHelper: helper.ErrHelper{Err: nil},
+				}
+				keyList = append(keyList, key)
+				continue
+			} else {
+				component.Logger.Errorf(ctx, "cache %s set failed, err: %v", c.GetName(), setRet.Err)
+			}
+
+			switch setRet.HandleErrStrategy {
+			case cache.HandleErrStrategyContinue:
+				ret[key] = SetResult{
+					ErrHelper: helper.ErrHelper{Err: nil},
+				}
+				keyList = append(keyList, key)
+			case cache.HandleErrStrategyBreak:
+				ret[key] = SetResult{
+					ErrHelper: helper.ErrHelper{Err: setRet.Err},
+				}
+			case cache.HandleErrStrategyRetry:
+				setRet = c.RetrySetCache(ctx, key, vMap[key])
+				if setRet.IsSuccess() {
+					ret[key] = SetResult{
+						ErrHelper: helper.ErrHelper{Err: nil},
+					}
+					keyList = append(keyList, key)
+				} else {
+					ret[key] = SetResult{
+						ErrHelper: helper.ErrHelper{Err: setRet.Err},
+					}
+				}
+			}
+		}
+	}
+
+	return ret
+}
+
+func (c *chain) Clear(ctx context.Context, key string) ClearResult {
+	ret := ClearResult{}
+
+	if len(c.cacheList) == 0 {
+		ret.Err = cacheerr.NoCacheSet
+		return ret
+	}
+
+	for _, c := range c.cacheList {
+		clearRet := c.ClearCache(ctx, key)
+		if clearRet.IsSuccess() {
+			continue
+		} else {
+			component.Logger.Errorf(ctx, "cache %s clear failed, err: %v", c.GetName(), clearRet.Err)
+		}
+
+		switch clearRet.HandleErrStrategy {
+		case cache.HandleErrStrategyContinue:
+			continue
+		case cache.HandleErrStrategyBreak:
+			ret.Err = clearRet.Err
+			return ret
+		case cache.HandleErrStrategyRetry:
+			clearRet = c.RetryClearCache(ctx, key)
+			if clearRet.IsSuccess() {
+				continue
+			} else {
+				ret.Err = clearRet.Err
+				return ret
+			}
+		}
+	}
+
+	return ret
+}
+
+func (c *chain) BatchClear(ctx context.Context, keyList []string) map[string]ClearResult {
+	ret := make(map[string]ClearResult)
+
+	if len(c.cacheList) == 0 {
+		for _, key := range keyList {
+			ret[key] = ClearResult{
+				ErrHelper: helper.ErrHelper{Err: cacheerr.NoCacheSet},
+			}
+		}
+		return ret
+	}
+
+	for _, c := range c.cacheList {
+		clearRetMap := c.BatchClearCache(ctx, keyList)
+		keyList = make([]string, 0, len(keyList))
+		for key, clearRet := range clearRetMap {
+			if clearRet.IsSuccess() {
+				ret[key] = ClearResult{
+					ErrHelper: helper.ErrHelper{Err: nil},
+				}
+				keyList = append(keyList, key)
+				continue
+			} else {
+				component.Logger.Errorf(ctx, "cache %s clear failed, err: %v", c.GetName(), clearRet.Err)
+			}
+
+			switch clearRet.HandleErrStrategy {
+			case cache.HandleErrStrategyContinue:
+				ret[key] = ClearResult{
+					ErrHelper: helper.ErrHelper{Err: nil},
+				}
+				keyList = append(keyList, key)
+			case cache.HandleErrStrategyBreak:
+				ret[key] = ClearResult{
+					ErrHelper: helper.ErrHelper{Err: clearRet.Err},
+				}
+			case cache.HandleErrStrategyRetry:
+				clearRet = c.RetryClearCache(ctx, key)
+				if clearRet.IsSuccess() {
+					ret[key] = ClearResult{
+						ErrHelper: helper.ErrHelper{Err: nil},
+					}
+					keyList = append(keyList, key)
+				} else {
+					ret[key] = ClearResult{
+						ErrHelper: helper.ErrHelper{Err: clearRet.Err},
+					}
+				}
+			}
+		}
+	}
+
+	return ret
+}
