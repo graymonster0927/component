@@ -9,7 +9,7 @@ import (
 	"github.com/graymonster0927/component/cachechain/helper"
 )
 
-type chain struct {
+type Chain struct {
 	cacheList []cache.CacheInterface
 }
 
@@ -29,35 +29,35 @@ type ClearResult struct {
 	helper.ErrHelper
 }
 
-func NewCacheChain() *chain {
-	return &chain{
+func NewCacheChain() *Chain {
+	return &Chain{
 		cacheList: make([]cache.CacheInterface, 0),
 	}
 }
 
-func (c *chain) WithCache(cache cache.CacheInterface) {
+func (c *Chain) WithCache(cache cache.CacheInterface) {
 	c.cacheList = append(c.cacheList, cache)
 }
 
-func (c *chain) SetFnGetNoCache(fn func(c context.Context, key string) (string, error)) {
+func (c *Chain) SetFnGetNoCache(fn func(c context.Context, key string) (string, error)) {
 	for _, c := range c.cacheList {
 		c.SetFnGetNoCache(fn)
 	}
 }
 
-func (c *chain) SetFnBatchGetNoCache(fn func(c context.Context, keyList []string) (map[string]string, error)) {
+func (c *Chain) SetFnBatchGetNoCache(fn func(c context.Context, keyList []string) (map[string]string, error)) {
 	for _, c := range c.cacheList {
 		c.SetFnBatchGetNoCache(fn)
 	}
 }
 
-func (c *chain) SetKeyPrefix(keyPrefix string) {
+func (c *Chain) SetKeyPrefix(keyPrefix string) {
 	for _, c := range c.cacheList {
 		c.SetKeyPrefix(keyPrefix)
 	}
 }
 
-func (c *chain) Get(ctx context.Context, key string) GetResult {
+func (c *Chain) Get(ctx context.Context, key string) GetResult {
 	ret := GetResult{
 		Exist: false,
 	}
@@ -103,7 +103,7 @@ func (c *chain) Get(ctx context.Context, key string) GetResult {
 	return ret
 }
 
-func (c *chain) BatchGet(ctx context.Context, keyList []string) map[string]GetResult {
+func (c *Chain) BatchGet(ctx context.Context, keyList []string) map[string]GetResult {
 	ret := make(map[string]GetResult)
 
 	if len(c.cacheList) == 0 {
@@ -171,7 +171,7 @@ func (c *chain) BatchGet(ctx context.Context, keyList []string) map[string]GetRe
 	return ret
 }
 
-func (c *chain) Set(ctx context.Context, key string, val string) SetResult {
+func (c *Chain) Set(ctx context.Context, key string, val string) SetResult {
 	ret := SetResult{}
 
 	if len(c.cacheList) == 0 {
@@ -208,7 +208,7 @@ func (c *chain) Set(ctx context.Context, key string, val string) SetResult {
 
 }
 
-func (c *chain) BatchSet(ctx context.Context, keyList []string, valList []string) map[string]SetResult {
+func (c *Chain) BatchSet(ctx context.Context, keyList []string, valList []string) map[string]SetResult {
 	ret := make(map[string]SetResult)
 
 	if len(c.cacheList) == 0 {
@@ -269,7 +269,7 @@ func (c *chain) BatchSet(ctx context.Context, keyList []string, valList []string
 	return ret
 }
 
-func (c *chain) Clear(ctx context.Context, key string) ClearResult {
+func (c *Chain) Clear(ctx context.Context, key string) ClearResult {
 	ret := ClearResult{}
 
 	if len(c.cacheList) == 0 {
@@ -305,7 +305,7 @@ func (c *chain) Clear(ctx context.Context, key string) ClearResult {
 	return ret
 }
 
-func (c *chain) BatchClear(ctx context.Context, keyList []string) map[string]ClearResult {
+func (c *Chain) BatchClear(ctx context.Context, keyList []string) map[string]ClearResult {
 	ret := make(map[string]ClearResult)
 
 	if len(c.cacheList) == 0 {

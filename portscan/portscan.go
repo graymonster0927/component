@@ -15,7 +15,7 @@ const (
 	taskTypeScanEIPPort = 1
 )
 
-type portScan struct {
+type PortScan struct {
 	ctx         context.Context
 	ipList      []string
 	openPortMap map[string][]int
@@ -23,18 +23,18 @@ type portScan struct {
 	timeout     time.Duration
 }
 
-func NewPortScan(ctx context.Context, ipList []string) *portScan {
-	return &portScan{ctx: ctx, ipList: ipList, openPortMap: make(map[string][]int), concurrent: 500, timeout: 100 * time.Millisecond}
+func NewPortScan(ctx context.Context, ipList []string) *PortScan {
+	return &PortScan{ctx: ctx, ipList: ipList, openPortMap: make(map[string][]int), concurrent: 500, timeout: 100 * time.Millisecond}
 }
 
-func (p *portScan) SetConcurrent(concurrent int) {
+func (p *PortScan) SetConcurrent(concurrent int) {
 	p.concurrent = concurrent
 }
-func (p *portScan) SetTimeout(timeout time.Duration) {
+func (p *PortScan) SetTimeout(timeout time.Duration) {
 	p.timeout = timeout
 }
 
-func (p *portScan) Scan() error {
+func (p *PortScan) Scan() error {
 	taskPool := taskpool.GetTaskPool(p.ctx)
 	taskPool.SetGPoolSize(p.concurrent)
 	taskPool.SetTaskHandler(taskTypeScanEIPPort, func(ctx context.Context, params map[string]interface{}) (interface{}, error) {
@@ -70,10 +70,10 @@ func (p *portScan) Scan() error {
 	return nil
 }
 
-func (p *portScan) GetOpenPortMap() map[string][]int {
+func (p *PortScan) GetOpenPortMap() map[string][]int {
 	return p.openPortMap
 }
-func (p *portScan) checkPortOpen(ip string, port int) bool {
+func (p *PortScan) checkPortOpen(ip string, port int) bool {
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", ip, port), p.timeout)
 	if err != nil {
 		return false
@@ -82,7 +82,7 @@ func (p *portScan) checkPortOpen(ip string, port int) bool {
 	return true
 }
 
-func (p *portScan) handleTaskResult(retList map[string]interface{}) {
+func (p *PortScan) handleTaskResult(retList map[string]interface{}) {
 	for key, v := range retList {
 		ret := v.(bool)
 		if ret {

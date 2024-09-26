@@ -28,7 +28,7 @@ type task struct {
 	taskType TaskType
 	label    string
 }
-type taskPool struct {
+type TaskPool struct {
 	taskCount int
 	fn        map[TaskType]func(ctx context.Context, params map[string]interface{}) (interface{}, error)
 	ctx       context.Context
@@ -37,8 +37,8 @@ type taskPool struct {
 	retList   map[string]interface{}
 }
 
-func GetTaskPool(ctx context.Context) *taskPool {
-	return &taskPool{
+func GetTaskPool(ctx context.Context) *TaskPool {
+	return &TaskPool{
 		ctx:      ctx,
 		taskList: make([]*task, 0, 8),
 		errList:  make(map[string]error),
@@ -47,15 +47,15 @@ func GetTaskPool(ctx context.Context) *taskPool {
 	}
 }
 
-func (t *taskPool) SetGPoolSize(size int) {
+func (t *TaskPool) SetGPoolSize(size int) {
 	gPoolSize = size
 }
 
-func (t *taskPool) SetTaskHandler(taskType TaskType, fn func(ctx context.Context, params map[string]interface{}) (interface{}, error)) {
+func (t *TaskPool) SetTaskHandler(taskType TaskType, fn func(ctx context.Context, params map[string]interface{}) (interface{}, error)) {
 	t.fn[taskType] = fn
 }
 
-func (t *taskPool) AddTask(taskType TaskType, label string, params map[string]interface{}) {
+func (t *TaskPool) AddTask(taskType TaskType, label string, params map[string]interface{}) {
 	t.taskList = append(t.taskList, &task{
 		taskType: taskType,
 		label:    label,
@@ -64,7 +64,7 @@ func (t *taskPool) AddTask(taskType TaskType, label string, params map[string]in
 	t.taskCount++
 }
 
-func (t *taskPool) Start() error {
+func (t *TaskPool) Start() error {
 
 	if t.taskCount == 0 {
 		return errors.New("当前没有任务")
@@ -132,15 +132,15 @@ func (t *taskPool) Start() error {
 	return nil
 }
 
-func (t *taskPool) GetRetList() map[string]interface{} {
+func (t *TaskPool) GetRetList() map[string]interface{} {
 	return t.retList
 }
 
-func (t *taskPool) GetErrList() map[string]error {
+func (t *TaskPool) GetErrList() map[string]error {
 	return t.errList
 }
 
-func (t *taskPool) Clear(ctx context.Context) {
+func (t *TaskPool) Clear(ctx context.Context) {
 	t.ctx = ctx
 	t.taskList = make([]*task, 0, 8)
 	t.errList = make(map[string]error)
