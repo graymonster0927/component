@@ -59,6 +59,3 @@ type CacheInterface interface {
 	SetFnBatchGetNoCache(fn func(c context.Context, keyList []string) (map[string]string, error))
 	SetKeyPrefix(keyPrefix string)
 }
-
-type ExtraSetParams interface {
-}

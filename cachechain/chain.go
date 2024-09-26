@@ -39,17 +39,6 @@ func (c *chain) WithCache(cache cache.CacheInterface) {
 	c.cacheList = append(c.cacheList, cache)
 }
 
-//func Test() {
-//	cacheHelper := NewCacheChain()
-//	redisCache := cache.NewRedisCache(cache.WithExpireTime(60), cache.WithTokenPrefix("zyb:security-manager:cachechain"))
-//	cacheHelper.WithCache(redisCache)
-//
-//	cacheHelper.SetKeyPrefix("")
-//	cacheHelper.SetFnGetNoCache("")
-//	cacheHelper.Get(context.Background(), "test")
-//
-//}
-
 func (c *chain) SetFnGetNoCache(fn func(c context.Context, key string) (string, error)) {
 	for _, c := range c.cacheList {
 		c.SetFnGetNoCache(fn)
@@ -175,7 +164,6 @@ func (c *chain) BatchGet(ctx context.Context, keyList []string) map[string]GetRe
 						Exist:     getRet.Exist,
 						V:         getRet.Value,
 					}
-					continue
 				}
 			}
 		}
