@@ -36,7 +36,7 @@ func (r *RedisDefault) Del(ctx context.Context, keys ...string) Cmder {
 }
 
 type RedisV8 struct {
-	client *redis.Client
+	Client *redis.Client
 }
 
 type RedisV8Pipeline struct {
@@ -59,7 +59,7 @@ func (r *RedisV8Cmd) Args() []interface{} {
 
 func (r *RedisV8Pipeline) Exec(ctx context.Context) ([]Cmder, error) {
 	v, e := r.pipeliner.Exec(ctx)
-	retCmdList := make([]Cmder, len(v))
+	retCmdList := make([]Cmder, 0, len(v))
 	for _, vv := range v {
 		cmd := vv.(*redis.Cmd)
 		i, e := cmd.Result()
@@ -79,7 +79,7 @@ func (r *RedisV8Pipeline) Eval(ctx context.Context, script string, keys []string
 }
 
 func (r *RedisV8) Del(ctx context.Context, keys ...string) Cmder {
-	v := r.client.Del(ctx, keys...)
+	v := r.Client.Del(ctx, keys...)
 	i, e := v.Result()
 	retCmd := RedisV8Cmd{
 		args:   v.Args(),
@@ -90,11 +90,11 @@ func (r *RedisV8) Del(ctx context.Context, keys ...string) Cmder {
 }
 
 func (r *RedisV8) Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error) {
-	return r.client.Eval(ctx, script, keys, args...).Result()
+	return r.Client.Eval(ctx, script, keys, args...).Result()
 }
 
 func (r *RedisV8) Pipeline() Pipeliner {
 	return &RedisV8Pipeline{
-		pipeliner: r.client.Pipeline(),
+		pipeliner: r.Client.Pipeline(),
 	}
 }
