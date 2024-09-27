@@ -327,7 +327,6 @@ func (r *RedisCache) handleGetFromRedis(c context.Context, isBatch bool, handleM
 			err = errInner
 			fromNoCacheVal[fromNoCacheList[0]] = v
 		}
-
 		for key, val := range fromNoCacheVal {
 			ret := GetCacheResult{}
 			ret.HandleErrStrategy = r.opts.strategy
@@ -487,6 +486,7 @@ func (r *RedisCache) batchGetFromRedis(c context.Context, keyList []string) map[
 }
 
 func (r *RedisCache) setCacheWithToken(c context.Context, key, token, value string) error {
+	key = fmt.Sprintf(r.keyPrefix, key)
 	_, err := r.redisCas(c, key, token, value)
 	if err != nil {
 		component.Logger.Errorf(c, "set value from redis cache with token invalid (%v)", zap.String("key", key))
@@ -495,6 +495,7 @@ func (r *RedisCache) setCacheWithToken(c context.Context, key, token, value stri
 
 }
 func (r *RedisCache) clearCacheWithToken(c context.Context, key string, token string) error {
+	key = fmt.Sprintf(r.keyPrefix, key)
 	_, err := r.redisCas(c, key, token, "")
 
 	if err != nil {
