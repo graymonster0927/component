@@ -98,7 +98,7 @@ func NewRedisCache(opts ...RedisCacheOption) *RedisCache {
 		opts: op,
 		conn: &component.RedisDefault{},
 	}
-	if op.conn == nil {
+	if op.conn != nil {
 		cache.conn = op.conn
 	}
 	return cache
@@ -134,6 +134,7 @@ func (r *RedisCache) BatchGetFromCache(c context.Context, keyList []string) map[
 }
 
 func (r *RedisCache) SetCache(ctx context.Context, key string, val string) SetCacheResult {
+	key = fmt.Sprintf(r.keyPrefix, key)
 	_, err := r.conn.Del(ctx, key).Result()
 	if err != nil {
 		component.Logger.Errorf(ctx, "redis set key failed", zap.Error(err), zap.String("key", key))
@@ -147,6 +148,9 @@ func (r *RedisCache) SetCache(ctx context.Context, key string, val string) SetCa
 }
 
 func (r *RedisCache) BatchSetCache(ctx context.Context, keyList []string, valList []string) map[string]SetCacheResult {
+	for idx, key := range keyList {
+		keyList[idx] = fmt.Sprintf(r.keyPrefix, key)
+	}
 	_, err := r.conn.Del(ctx, keyList...).Result()
 	if err != nil {
 		component.Logger.Errorf(ctx, "redis set key failed", zap.Error(err), zap.Any("key", keyList))
@@ -165,6 +169,7 @@ func (r *RedisCache) BatchSetCache(ctx context.Context, keyList []string, valLis
 }
 
 func (r *RedisCache) ClearCache(ctx context.Context, key string) ClearCacheResult {
+	key = fmt.Sprintf(r.keyPrefix, key)
 	_, err := r.conn.Del(ctx, key).Result()
 	if err != nil {
 		component.Logger.Errorf(ctx, "redis clear key failed", zap.Error(err), zap.String("key", key))
@@ -178,6 +183,9 @@ func (r *RedisCache) ClearCache(ctx context.Context, key string) ClearCacheResul
 }
 
 func (r *RedisCache) BatchClearCache(ctx context.Context, keyList []string) map[string]ClearCacheResult {
+	for idx, key := range keyList {
+		keyList[idx] = fmt.Sprintf(r.keyPrefix, key)
+	}
 	_, err := r.conn.Del(ctx, keyList...).Result()
 	if err != nil {
 		component.Logger.Errorf(ctx, "redis clear key failed", zap.Error(err), zap.Any("key", keyList))

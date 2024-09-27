@@ -39,13 +39,13 @@ func (c *Chain) WithCache(cache cache.CacheInterface) {
 	c.cacheList = append(c.cacheList, cache)
 }
 
-func (c *Chain) SetFnGetNoCache(fn func(c context.Context, key string) (string, error)) {
+func (c *Chain) SetFnGetNoCache(fn func(c context.Context, key string) (interface{}, error)) {
 	for _, c := range c.cacheList {
 		c.SetFnGetNoCache(fn)
 	}
 }
 
-func (c *Chain) SetFnBatchGetNoCache(fn func(c context.Context, keyList []string) (map[string]string, error)) {
+func (c *Chain) SetFnBatchGetNoCache(fn func(c context.Context, keyList []string) (map[string]interface{}, error)) {
 	for _, c := range c.cacheList {
 		c.SetFnBatchGetNoCache(fn)
 	}
