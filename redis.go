@@ -9,6 +9,7 @@ type RedisInterface interface {
 	Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error)
 	Pipeline() Pipeliner
 	Del(ctx context.Context, keys ...string) Cmder
+	Get(ctx context.Context, key string) (string, error)
 }
 
 type Pipeliner interface {
@@ -33,6 +34,10 @@ func (r *RedisDefault) Pipeline() Pipeliner {
 
 func (r *RedisDefault) Del(ctx context.Context, keys ...string) Cmder {
 	return nil
+}
+
+func (r *RedisDefault) Get(ctx context.Context, key string) (string, error) {
+	return "", nil
 }
 
 type RedisV8 struct {
@@ -97,4 +102,8 @@ func (r *RedisV8) Pipeline() Pipeliner {
 	return &RedisV8Pipeline{
 		pipeliner: r.Client.Pipeline(),
 	}
+}
+
+func (r *RedisV8) Get(ctx context.Context, key string) (string, error) {
+	return r.Client.Get(ctx, key).Result()
 }
