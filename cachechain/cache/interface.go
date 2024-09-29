@@ -11,6 +11,7 @@ import (
 //失败策略
 
 type HandleErrStrategy int
+type CacheType int
 
 const (
 	_ = iota

@@ -56,7 +56,6 @@ func (c *Chain) SetKeyPrefix(keyPrefix string) {
 		c.SetKeyPrefix(keyPrefix)
 	}
 }
-
 func (c *Chain) Get(ctx context.Context, key string) GetResult {
 	ret := GetResult{
 		Exist: false,
@@ -102,7 +101,6 @@ func (c *Chain) Get(ctx context.Context, key string) GetResult {
 
 	return ret
 }
-
 func (c *Chain) BatchGet(ctx context.Context, keyList []string) map[string]GetResult {
 	ret := make(map[string]GetResult)
 
