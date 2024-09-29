@@ -225,17 +225,17 @@ func (r *RedisCache) RetryClearCache(ctx context.Context, key string) ClearCache
 }
 
 func (r *RedisCache) getFromRedis(c context.Context, key string) redisGetResult {
-	key = fmt.Sprintf(r.keyPrefix, key)
+	prefixKey := fmt.Sprintf(r.keyPrefix, key)
 	cacheVal := redisGetResult{
 		Exist: false,
 	}
 
 	token := r.generateRedisToken()
-	temp, err := r.redisCas(c, key, "", token)
+	temp, err := r.redisCas(c, prefixKey, "", token)
 	if err != nil {
 		cacheVal.Err = err
 		cacheVal.Status = RedisCacheStatusOK
-		component.Logger.Errorf(c, "redis get value invalid", zap.Error(err), zap.String("key", key), zap.Any("value", temp))
+		component.Logger.Errorf(c, "redis get value invalid", zap.Error(err), zap.String("key", prefixKey), zap.Any("value", temp))
 		return cacheVal
 	}
 
@@ -375,17 +375,18 @@ func (r *RedisCache) handleGetFromRedis(c context.Context, isBatch bool, handleM
 }
 
 func (r *RedisCache) batchGetFromRedis(c context.Context, keyList []string) map[string]redisGetResult {
-	for idx, key := range keyList {
-		keyList[idx] = fmt.Sprintf(r.keyPrefix, key)
-	}
 	cacheValList := make(map[string]redisGetResult)
 	batchKeyList := make([]string, 0, len(keyList))
 	batchTokenList := make(map[string]string)
 	batchCheckValList := make(map[string]string)
 
-	tempList, err := r.redisPipe(c, keyList)
+	prefixKeyList := make([]string, 0, len(keyList))
+	for _, key := range keyList {
+		prefixKeyList = append(prefixKeyList, fmt.Sprintf(r.keyPrefix, key))
+	}
+	tempList, err := r.redisPipe(c, prefixKeyList)
 	if err != nil {
-		component.Logger.Errorf(c, "redis redisPipe invalid", zap.Error(err), zap.Any("key", keyList))
+		component.Logger.Errorf(c, "redis redisPipe invalid", zap.Error(err), zap.Any("key", prefixKeyList))
 		for _, key := range keyList {
 			ret := redisGetResult{}
 			ret.Err = err
@@ -393,8 +394,8 @@ func (r *RedisCache) batchGetFromRedis(c context.Context, keyList []string) map[
 		}
 		return cacheValList
 	}
-	for _, key := range keyList {
-		if val, ok := tempList[key]; ok {
+	for idx, prefixKey := range prefixKeyList {
+		if val, ok := tempList[prefixKey]; ok {
 			if valString, ok := val.(string); ok {
 				if valString != "" && !strings.HasPrefix(valString, fmt.Sprintf("%s@", r.opts.tokenPrefix)) {
 					cacheVal := redisGetResult{
@@ -403,54 +404,54 @@ func (r *RedisCache) batchGetFromRedis(c context.Context, keyList []string) map[
 					cacheVal.Exist = true
 					cacheVal.Value = valString
 					cacheVal.Status = RedisCacheStatusOK
-					cacheValList[key] = cacheVal
+					cacheValList[keyList[idx]] = cacheVal
 					continue
 				}
 			}
 		}
-		batchKeyList = append(batchKeyList, key)
-		batchTokenList[key] = r.generateRedisToken()
-		batchCheckValList[key] = ""
+		batchKeyList = append(batchKeyList, prefixKey)
+		batchTokenList[prefixKey] = r.generateRedisToken()
+		batchCheckValList[prefixKey] = ""
 	}
 
 	if len(batchKeyList) > 0 {
 		tempList, err := r.redisCasPipe(c, batchKeyList, batchCheckValList, batchTokenList)
 		if err != nil {
 			component.Logger.Errorf(c, "redis redisCasPipe invalid", zap.Error(err), zap.Any("key", keyList))
-			for _, key := range keyList {
+			for _, prefixKey := range batchKeyList {
 				ret := redisGetResult{}
 				ret.Err = err
-				cacheValList[key] = ret
+				cacheValList[strings.TrimPrefix(prefixKey, r.keyPrefix)] = ret
 			}
 			return cacheValList
 		}
 
-		for _, key := range batchKeyList {
+		for _, prefixKey := range batchKeyList {
 			cacheVal := redisGetResult{
 				Exist: false,
 			}
-			temp := tempList[key]
+			temp := tempList[prefixKey]
 			if tempString, ok := temp.(string); ok {
 				//返回空值 说明当前拿到了token
 				//返回token 说明当前已经有请求在走DB
 				//返回非token 说明有缓存值
 				switch true {
 				case tempString == "":
-					cacheVal.Token = batchTokenList[key]
+					cacheVal.Token = batchTokenList[prefixKey]
 					cacheVal.Status = RedisCacheStatusDoReadDB
 				case strings.HasPrefix(tempString, fmt.Sprintf("%s@", r.opts.tokenPrefix)):
 					//判断超时
 					splitArr := strings.Split(tempString, "@")
 					for {
 						if len(splitArr) != 3 || splitArr[0] != r.opts.tokenPrefix {
-							component.Logger.Errorf(c, "token invalid", zap.Error(err), zap.String("key", key), zap.Any("value", tempString))
+							component.Logger.Errorf(c, "token invalid", zap.Error(err), zap.String("key", prefixKey), zap.Any("value", tempString))
 							cacheVal.Err = errors.New("token invalid:" + tempString)
 							cacheVal.Status = RedisCacheStatusOK
 							break
 						}
 						expireTime, err := strconv.ParseInt(splitArr[2], 10, 64)
 						if err != nil {
-							component.Logger.Errorf(c, "token invalid", zap.Error(err), zap.String("key", key), zap.Any("value", tempString))
+							component.Logger.Errorf(c, "token invalid", zap.Error(err), zap.String("key", prefixKey), zap.Any("value", tempString))
 							cacheVal.Err = errors.New("token invalid:" + tempString)
 							cacheVal.Status = RedisCacheStatusOK
 							break
@@ -458,8 +459,8 @@ func (r *RedisCache) batchGetFromRedis(c context.Context, keyList []string) map[
 
 						if expireTime < time.Now().Unix() {
 							//超时 删掉重试
-							if err := r.clearCacheWithToken(c, key, tempString); err != nil {
-								component.Logger.Errorf(c, "clear cache err", zap.Error(err), zap.String("key", key), zap.Any("value", tempString))
+							if err := r.clearCacheWithToken(c, strings.TrimPrefix(prefixKey, r.keyPrefix), tempString); err != nil {
+								component.Logger.Errorf(c, "clear cache err", zap.Error(err), zap.String("key", prefixKey), zap.Any("value", tempString))
 								cacheVal.Err = err
 								cacheVal.Status = RedisCacheStatusOK
 								break
@@ -478,7 +479,7 @@ func (r *RedisCache) batchGetFromRedis(c context.Context, keyList []string) map[
 				}
 
 			}
-			cacheValList[key] = cacheVal
+			cacheValList[strings.TrimPrefix(prefixKey, r.keyPrefix)] = cacheVal
 		}
 	}
 
