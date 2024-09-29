@@ -235,6 +235,7 @@ func (r *RedisCache) getFromRedis(c context.Context, key string) redisGetResult 
 	v, err := r.conn.Get(c, prefixKey)
 	if err == nil {
 		cacheVal.Status = RedisCacheStatusOK
+		cacheVal.Exist = v != ""
 		cacheVal.Value = v
 		return cacheVal
 	}
@@ -318,7 +319,7 @@ func (r *RedisCache) batchGetFromRedis(c context.Context, keyList []string) map[
 			if valString, ok := val.(string); ok {
 				if !strings.HasPrefix(valString, fmt.Sprintf("%s@", r.opts.tokenPrefix)) {
 					cacheVal := redisGetResult{}
-					cacheVal.Exist = true
+					cacheVal.Exist = valString != ""
 					cacheVal.Value = valString
 					cacheVal.Status = RedisCacheStatusOK
 					cacheValList[keyList[idx]] = cacheVal
@@ -468,7 +469,7 @@ func (r *RedisCache) handleGetFromRedis(c context.Context, isBatch bool, handleM
 				component.Logger.Error(c, "baseBatchGet set cache err", zap.Error(err))
 				ret.Err = errors.Join(ret.Err, err)
 			}
-			ret.Exist = true
+			ret.Exist = fromNoCacheVal[key] != ""
 			ret.Value = fromNoCacheVal[key]
 			retMap[key] = ret
 
