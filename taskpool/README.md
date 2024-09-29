@@ -1,8 +1,16 @@
 ### 任务池
 
-1. 简化代码 统一封装
-2. 加入协程池 减少gc
-3. 任务限速(todo)
+### 特征
+1. 任务通过 goroutine 并发执行
+2. 简化代码 统一封装 
+3. 加入协程池 减少gc 通过 [ants](https://github.com/panjf2000/ants) 支持。
+
+### 安装
+
+```
+go get github.com/graymonster0927/component
+```
+### 使用
 
 
 使用场景:
@@ -120,4 +128,8 @@ func main() {
 
 ```
 
-#### 非协程安全
+### TODO
+* 支持按任务维度限速
+
+### 贡献
+欢迎提交问题（issues）或请求（pull requests）以帮助改进该库。
