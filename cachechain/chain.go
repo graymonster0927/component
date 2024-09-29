@@ -73,7 +73,7 @@ func (c *Chain) Get(ctx context.Context, key string) GetResult {
 		if getRet.IsSuccess() {
 			ret.Err = nil
 			ret.FromCache = true
-			ret.Exist = true
+			ret.Exist = getRet.Exist
 			ret.V = getRet.Value
 			return ret
 		} else {
