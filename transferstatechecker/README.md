@@ -19,13 +19,13 @@ go get github.com/graymonster0927/component
 	checker := NewTransferStateChecker()
 
 	var stateTypeOrder StateType = 1
-	var stateOrderDefault = 1
-	var stateOrderIng = 1
-	var stateOrderDone = 1
-	var stateOrderClosed = 1
-	var stateOrderCancel = 1
+	var stateOrderDefault State = 1
+	var stateOrderIng State = 1
+	var stateOrderDone State = 1
+	var stateOrderClosed State = 1
+	var stateOrderCancel State = 1
 
-	checker.SetStateRel(stateTypeOrder, map[int]map[int]struct{}{
+	checker.SetStateRel(stateTypeOrder, map[State]map[State]struct{}{
 		stateOrderDefault: {
 			stateOrderIng: {},
 		},

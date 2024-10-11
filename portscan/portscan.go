@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	taskTypeScanEIPPort = 1
+	taskTypeScanPort = 1
 )
 
 type PortScan struct {
@@ -37,7 +37,7 @@ func (p *PortScan) SetTimeout(timeout time.Duration) {
 func (p *PortScan) Scan() error {
 	taskPool := taskpool.GetTaskPool(p.ctx)
 	taskPool.SetGPoolSize(p.concurrent)
-	taskPool.SetTaskHandler(taskTypeScanEIPPort, func(ctx context.Context, params map[string]interface{}) (interface{}, error) {
+	taskPool.SetTaskHandler(taskTypeScanPort, func(ctx context.Context, params map[string]interface{}) (interface{}, error) {
 		ip := params["ip"].(string)
 		port := params["port"].(int)
 		return p.checkPortOpen(ip, port), nil
@@ -47,7 +47,7 @@ func (p *PortScan) Scan() error {
 	for _, ip := range p.ipList {
 		component.Logger.Infof(p.ctx, "scanning %s", ip)
 		for port := 1; port <= 65535; port++ {
-			taskPool.AddTask(taskTypeScanEIPPort, fmt.Sprintf("%s:%d", ip, port), map[string]interface{}{
+			taskPool.AddTask(taskTypeScanPort, fmt.Sprintf("%s:%d", ip, port), map[string]interface{}{
 				"ip":   ip,
 				"port": port,
 			})
@@ -58,15 +58,18 @@ func (p *PortScan) Scan() error {
 				}
 				p.handleTaskResult(taskPool.GetRetList())
 				taskPool.Clear(p.ctx)
+				count = 0
 			}
 
 		}
 	}
-	if err := taskPool.Start(); err != nil {
-		return err
+	if count > 0 {
+		if err := taskPool.Start(); err != nil {
+			return err
+		}
+		p.handleTaskResult(taskPool.GetRetList())
+		taskPool.Clear(p.ctx)
 	}
-	p.handleTaskResult(taskPool.GetRetList())
-	taskPool.Clear(p.ctx)
 	return nil
 }
 
