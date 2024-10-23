@@ -233,7 +233,7 @@ func (r *RedisCache) getFromRedis(c context.Context, key string) redisGetResult 
 	}
 
 	v, err := r.conn.Get(c, prefixKey)
-	if err == nil {
+	if err == nil && !strings.HasPrefix(v, fmt.Sprintf("%s@", r.opts.tokenPrefix)) {
 		cacheVal.Status = RedisCacheStatusOK
 		cacheVal.Exist = v != ""
 		cacheVal.Value = v
