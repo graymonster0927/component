@@ -259,7 +259,7 @@ func (r *RedisCache) getFromRedis(c context.Context, key string) redisGetResult 
 		case strings.HasPrefix(tempString, fmt.Sprintf("%s@", r.opts.tokenPrefix)):
 			//判断超时
 			splitArr := strings.Split(tempString, "@")
-			if len(splitArr) != 3 || splitArr[0] != "eeo-uc-token" {
+			if len(splitArr) != 3 || splitArr[0] != r.opts.tokenPrefix {
 				cacheVal.Err = errors.New("token invalid:" + tempString)
 				cacheVal.Status = RedisCacheStatusOK
 				return cacheVal
