@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
+	"time"
 )
 
 type RedisInterface interface {
@@ -10,6 +11,8 @@ type RedisInterface interface {
 	Pipeline() Pipeliner
 	Del(ctx context.Context, keys ...string) Cmder
 	Get(ctx context.Context, key string) (string, error)
+	LPush(ctx context.Context, key string, values ...interface{}) *IntCmd
+	RPop(ctx context.Context, key string) *StringCmd
 }
 
 type Pipeliner interface {
@@ -20,6 +23,35 @@ type Pipeliner interface {
 type Cmder interface {
 	Args() []interface{}
 	Result() (interface{}, error)
+}
+
+type baseCmd struct {
+	ctx    context.Context
+	args   []interface{}
+	err    error
+	keyPos int8
+
+	_readTimeout *time.Duration
+}
+
+type StringCmd struct {
+	baseCmd
+
+	val string
+}
+
+func (cmd *StringCmd) Result() (string, error) {
+	return cmd.val, cmd.err
+}
+
+type IntCmd struct {
+	baseCmd
+
+	val int64
+}
+
+func (cmd *IntCmd) Result() (int64, error) {
+	return cmd.val, cmd.err
 }
 
 type RedisDefault struct{}
@@ -38,6 +70,14 @@ func (r *RedisDefault) Del(ctx context.Context, keys ...string) Cmder {
 
 func (r *RedisDefault) Get(ctx context.Context, key string) (string, error) {
 	return "", nil
+}
+
+func (r *RedisDefault) LPush(ctx context.Context, key string, values ...interface{}) *IntCmd {
+	return nil
+}
+
+func (r *RedisDefault) RPop(ctx context.Context, key string) *StringCmd {
+	return nil
 }
 
 type RedisV8 struct {
@@ -106,4 +146,24 @@ func (r *RedisV8) Pipeline() Pipeliner {
 
 func (r *RedisV8) Get(ctx context.Context, key string) (string, error) {
 	return r.Client.Get(ctx, key).Result()
+}
+
+func (r *RedisV8) LPush(ctx context.Context, key string, values ...interface{}) *IntCmd {
+	retCmd := r.Client.LPush(ctx, key, values...)
+	return &IntCmd{
+		baseCmd: baseCmd{
+			args: retCmd.Args(),
+		},
+		val: retCmd.Val(),
+	}
+}
+
+func (r *RedisV8) RPop(ctx context.Context, key string) *StringCmd {
+	retCmd := r.Client.RPop(ctx, key)
+	return &StringCmd{
+		baseCmd: baseCmd{
+			args: retCmd.Args(),
+		},
+		val: retCmd.Val(),
+	}
 }
