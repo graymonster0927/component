@@ -113,8 +113,11 @@ for _, pattern := range patterns {
 
 ### TODO
 
+* 增加统计metrics
 * 扫描到可聚合数据后从树中清除
 * 支持自定义输出格式
+* 能够获取当前所有API
+* 增加标识符(比如ns+service/业务线/项目等)
 
 ### 贡献
 
