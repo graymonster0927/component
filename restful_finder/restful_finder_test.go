@@ -1,4 +1,4 @@
-package restful_formater
+package restful_finder
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestFormatter(t *testing.T) {
+func TestFinder(t *testing.T) {
 	tests := []struct {
 		name     string
 		apis     []string
@@ -19,6 +19,7 @@ func TestFormatter(t *testing.T) {
 				"/user/settings",
 			},
 			expected: "API Tree:\n" +
+				"Label:\n" +
 				"user\n" +
 				"├── profile\n" +
 				"└── settings\n",
@@ -32,6 +33,7 @@ func TestFormatter(t *testing.T) {
 				"/api/v1/users/settings",
 			},
 			expected: "API Tree:\n" +
+				"Label:\n" +
 				"api\n" +
 				"└── v1\n" +
 				"    ├── posts\n" +
@@ -50,6 +52,7 @@ func TestFormatter(t *testing.T) {
 				"/user///profile",
 			},
 			expected: "API Tree:\n" +
+				"Label:\n" +
 				"user\n" +
 				"└── profile\n",
 		},
@@ -57,8 +60,7 @@ func TestFormatter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			formatter := GetFormatter()
-
+			formatter := GetFinder()
 			// Record all APIs
 			for _, api := range tt.apis {
 				err := formatter.RecordAPI(api)
@@ -70,7 +72,6 @@ func TestFormatter(t *testing.T) {
 
 			// Get the string representation
 			result := formatter.String()
-
 			// Compare with expected output
 			if !compareStrings(result, tt.expected) {
 				t.Errorf("String() got:\n%v\nwant:\n%v", result, tt.expected)
@@ -88,8 +89,8 @@ func compareStrings(got, want string) bool {
 	return got == want
 }
 
-func TestFormatterConcurrency(t *testing.T) {
-	formatter := GetFormatter()
+func TestFinderConcurrency(t *testing.T) {
+	formatter := GetFinder()
 	done := make(chan bool)
 
 	// 并发写入测试
@@ -138,7 +139,7 @@ func TestFormatterConcurrency(t *testing.T) {
 }
 
 func TestWaitingQueue(t *testing.T) {
-	formatter := GetFormatter()
+	formatter := GetFinder()
 	formatter.Clear()
 
 	// 设置较小的阈值以便测试
@@ -201,7 +202,7 @@ func TestThresholdSetting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			formatter := GetFormatter()
+			formatter := GetFinder()
 			formatter.Clear()
 			formatter = WithThreshold(tt.threshold)
 
@@ -216,7 +217,7 @@ func TestThresholdSetting(t *testing.T) {
 }
 
 func TestHighConcurrencyWithThreshold(t *testing.T) {
-	formatter := GetFormatter()
+	formatter := GetFinder()
 	formatter.Clear()
 	formatter = WithThreshold(5)
 
@@ -289,8 +290,8 @@ func TestScanRestfulPattern(t *testing.T) {
 				"/api/v1/posts/3",
 			},
 			wantPatterns: []string{
-				"api/v1/users/*",
-				"api/v1/posts/*",
+				"/api/v1/users/*",
+				"/api/v1/posts/*",
 			},
 			wantErr: false,
 		},
@@ -306,8 +307,8 @@ func TestScanRestfulPattern(t *testing.T) {
 				"/api/v1/users/2/posts/3",
 			},
 			wantPatterns: []string{
-				"api/v1/users/1/posts/*",
-				"api/v1/users/2/posts/*",
+				"/api/v1/users/1/posts/*",
+				"/api/v1/users/2/posts/*",
 			},
 			wantErr: false,
 		},
@@ -323,8 +324,8 @@ func TestScanRestfulPattern(t *testing.T) {
 				"/api/v1/users/1/posts/3/comments",
 			},
 			wantPatterns: []string{
-				"api/v1/users/*/profile",
-				"api/v1/users/1/posts/*/comments",
+				"/api/v1/users/*/profile",
+				"/api/v1/users/1/posts/*/comments",
 			},
 			wantErr: false,
 		},
@@ -365,7 +366,7 @@ func TestScanRestfulPattern(t *testing.T) {
 				"/api/v1/users/4-_+/profile",
 			},
 			wantPatterns: []string{
-				"api/v1/users/*/profile",
+				"/api/v1/users/*/profile",
 			},
 			wantErr: false,
 		},
@@ -373,7 +374,7 @@ func TestScanRestfulPattern(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			formatter := GetFormatter()
+			formatter := GetFinder()
 			formatter.Clear()
 			formatter = WithThreshold(tt.threshold)
 
@@ -402,7 +403,7 @@ func TestScanRestfulPattern(t *testing.T) {
 }
 
 func TestConcurrentScanRestfulPattern(t *testing.T) {
-	formatter := GetFormatter()
+	formatter := GetFinder()
 	formatter.Clear()
 	formatter = WithThreshold(3)
 	formatter = WithWaitingList(3)
@@ -449,6 +450,31 @@ func TestConcurrentScanRestfulPattern(t *testing.T) {
 	// 验证是否找到了RESTful模式
 	if len(patterns) == 0 {
 		t.Error("Expected to find some RESTful patterns")
+	}
+}
+
+func TestRecordWithLabel(t *testing.T) {
+	formatter := GetFinder()
+	WithThreshold(5)
+	formatter.Clear()
+
+	labels := []string{"serviceA", "serviceB"}
+	for _, label := range labels {
+		for i := 0; i < 5; i++ {
+			_ = formatter.RecordAPIWithLabel(label, fmt.Sprintf("/%s/resource/%d", label, i))
+		}
+	}
+
+	patterns, _ := formatter.ScanRestfulPatternWithLabel()
+	expected := map[string]bool{
+		"/serviceA/resource/*": true,
+		"/serviceB/resource/*": true,
+	}
+
+	for _, p := range patterns {
+		if !expected[p.URL] {
+			t.Errorf("Unexpected pattern: %s", p.URL)
+		}
 	}
 }
 

@@ -7,13 +7,15 @@
 `/api/v1/users/wangwu/profile`
 
 上面的路径能被识别到 `/api/v1/users/*/profile`
+
 ### 特性
 
-1. 实现 RESTful 模式扫描
+1. 实现 RESTful 模式识别
 2. 支持高并发处理
-3. 内置等待队列机制
+3. 提供metrics收集
 4. 可配置的并发阈值
 5. 支持优雅的可视化输出
+6. 增加支持标识符(比如ns+service/业务线/项目等)
 
 ### 安装
 
@@ -97,6 +99,26 @@ for _, pattern := range patterns {
 }
 ```
 
+#### 4. 错误处理和指标收集
+```go
+
+// 初始化指标+注册到prometheus registry...
+metricCollectors := restful_finder.GetMetricCollectors("my_namespace")
+
+// 启用指标追踪
+formatter = restful_finder.WithTrace(&restful_finder.MetricTrace{})
+
+// 带标签记录API路径（用于多租户/多服务场景）
+err := formatter.RecordAPIWithLabel("payment-service", "/api/v1/orders/123/pay")
+if errors.Is(err, restful_finder.ErrTooManyRequests) {
+    // 处理限流情况
+    fmt.Println("系统繁忙，请稍后重试")
+}
+
+```
+
+
+
 
 ### 配置说明
 
@@ -113,11 +135,9 @@ for _, pattern := range patterns {
 
 ### TODO
 
-* 增加统计metrics
+~~* 增加统计metrics~~
 * 扫描到可聚合数据后从树中清除
-* 支持自定义输出格式
-* 能够获取当前所有API
-* 增加标识符(比如ns+service/业务线/项目等)
+~~* 增加标识符(比如ns+service/业务线/项目等)~~
 
 ### 贡献
 
