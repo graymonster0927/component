@@ -11,8 +11,8 @@ type RedisInterface interface {
 	Pipeline() Pipeliner
 	Del(ctx context.Context, keys ...string) Cmder
 	Get(ctx context.Context, key string) (string, error)
-	LPush(ctx context.Context, key string, values ...interface{}) *IntCmd
-	RPop(ctx context.Context, key string) *StringCmd
+	//LPush(ctx context.Context, key string, values ...interface{}) *IntCmd
+	//RPop(ctx context.Context, key string) *StringCmd
 }
 
 type Pipeliner interface {
