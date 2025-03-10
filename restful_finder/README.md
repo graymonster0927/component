@@ -115,6 +115,8 @@ if errors.Is(err, restful_finder.ErrTooManyRequests) {
     fmt.Println("系统繁忙，请稍后重试")
 }
 
+
+//指标大盘可以直接导入grafana.json文件快速建立
 ```
 
 
@@ -135,9 +137,7 @@ if errors.Is(err, restful_finder.ErrTooManyRequests) {
 
 ### TODO
 
-~~* 增加统计metrics~~
 * 扫描到可聚合数据后从树中清除
-~~* 增加标识符(比如ns+service/业务线/项目等)~~
 
 ### 贡献
 
