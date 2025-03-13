@@ -21,32 +21,32 @@ go get github.com/graymonster0927/component
     //创建一个 redis 缓存
     redisCache := cache.NewRedisCache(
         //可以实现自己的redis连接
-		cache.WithRedisConn(&RedisV8{}),
-		cache.WithTokenPrefix("cachechain:servicename"),
-	)
+	cache.WithRedisConn(&RedisV8{}),
+	cache.WithTokenPrefix("cachechain:servicename"),
+    )
 	
-	// 添加多个缓存层（如内存缓存、Redis缓存等）
-	chain.WithCache(redisCache)
+    // 添加多个缓存层（如内存缓存、Redis缓存等）
+    chain.WithCache(redisCache)
 
 ```
 获取数据
 ```
     chain := helpers.GetRedisCacheChain()
     //设置缓存前缀 比如 servicename:xxx:%d
-	chain.SetKeyPrefix(components.ApiResponseWhiteCacheKey)
+    chain.SetKeyPrefix(components.ApiResponseWhiteCacheKey)
 
-	fn := func() (username, error) {
-	    //数据库操作 比如根据电话号码拿用户名
-		return XXXXX()
-	}
-	chain.SetFnGetNoCache(func(cCtx context.Context, key string) (string, error) {
-		return fn()
-	})
+    fn := func() (username, error) {
+        //数据库操作 比如根据电话号码拿用户名
+	 return XXXXX()
+    }
+    chain.SetFnGetNoCache(func(cCtx context.Context, key string) (string, error) {
+        return fn()
+    })
     telephone := "12345678901"
-	getRet := chain.Get(ctx, telephone)
+    getRet := chain.Get(ctx, telephone)
     if !getRet.IsSuccess() {
         //缓存异常 直接不走缓存拿数据
-        //return fn()
+        return fn()
         //....
     }
 
@@ -59,13 +59,13 @@ go get github.com/graymonster0927/component
 写缓存
 ```
     chain := helpers.GetRedisCacheChain()
-	chain.SetKeyPrefix(components.ApiResponseWhiteCacheKey)
-	keyList := make([]string, len(relID))
-	valList := make([]string, len(relID), len(relID))
-	for i, v := range relID {
-		keyList[i] = fmt.Sprintf("%d", v)
-	}
-	setRet := chain.BatchSet(ctx, keyList, valList)
+    chain.SetKeyPrefix(components.ApiResponseWhiteCacheKey)
+    keyList := make([]string, len(relID))
+    valList := make([]string, len(relID), len(relID))
+    for i, v := range relID {
+        keyList[i] = fmt.Sprintf("%d", v)
+    }
+    setRet := chain.BatchSet(ctx, keyList, valList)
     if !setRet.IsSuccess() {
         //重试
         //返回异常
@@ -75,52 +75,52 @@ go get github.com/graymonster0927/component
 批量获取数据
 ```
     chain := helpers.GetRedisCacheChain()
-	chain.SetKeyPrefix(components.ApiResponseWhiteCacheKey)
+    chain.SetKeyPrefix(components.ApiResponseWhiteCacheKey)
 
-	fn := func() ([]User, error) {
-	    //数据库批量操作 比如根据电话号码批量拿用户列表
-		return XXXXX()
-	}
-	chain.SetFnBatchGetNoCache(func(cCtx context.Context, keyList []string) (map[string]string, error) {
-	    ret := make(map[string]string)
-		list, err := fn()
-		for _, v := range list {
-		    ret[v.telephone] = v.name
-		}
-		return ret, err
-	})
+    fn := func() ([]User, error) {
+        //数据库批量操作 比如根据电话号码批量拿用户列表
+        return XXXXX()
+    }
+    chain.SetFnBatchGetNoCache(func(cCtx context.Context, keyList []string) (map[string]string, error) {
+    ret := make(map[string]string)
+    list, err := fn()
+    for _, v := range list {
+        ret[v.telephone] = v.name
+    }
+        return ret, err
+    })
     telephoneList := []string{"12345678901", "12345678902"}
-	getRetMap := chain.BatchGet(ctx, telephoneList)
-	for _, v := range getRetMap {
-		if !v.IsSuccess() {
-			//缓存异常 直接不走缓存拿数据
-			//list, err := fn()
-			//....
-		}
+    getRetMap := chain.BatchGet(ctx, telephoneList)
+    for _, v := range getRetMap {
+        if !v.IsSuccess() {
+        //缓存异常 直接不走缓存拿数据
+        list, err := fn()
+        //....
+        }
 
-		if v.Exist {
-			//缓存存在 处理 返回数据
-			//xxx
-		}
-	}
+        if v.Exist {
+            //缓存存在 处理 返回数据
+            //xxx
+        }
+    }
 ```
 
 批量写缓存
 ```
     chain := helpers.GetRedisCacheChain()
-	chain.SetKeyPrefix(components.ApiResponseWhiteCacheKey)
-	keyList := make([]string, len(relID))
-	valList := make([]string, len(relID), len(relID))
-	for i, v := range relID {
-		keyList[i] = fmt.Sprintf("%d", v)
-	}
-	setRetMap := chain.Set(ctx, keyList, valList)
-	for _, v := range setRetMap {
-		if !v.IsSuccess() {
-			//重试
+    chain.SetKeyPrefix(components.ApiResponseWhiteCacheKey)
+    keyList := make([]string, len(relID))
+    valList := make([]string, len(relID), len(relID))
+    for i, v := range relID {
+        keyList[i] = fmt.Sprintf("%d", v)
+    }
+    setRetMap := chain.Set(ctx, keyList, valList)
+    for _, v := range setRetMap {
+        if !v.IsSuccess() {
+            //重试
             //返回异常
-		}
-	}
+        }
+    }
 ```
 
 ### 错误处理策略
