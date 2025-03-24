@@ -3,6 +3,7 @@ package cachechain
 import (
 	"context"
 	"errors"
+
 	"github.com/graymonster0927/component"
 	"github.com/graymonster0927/component/cachechain/cache"
 	"github.com/graymonster0927/component/cachechain/cacheerr"
@@ -66,17 +67,18 @@ func (c *Chain) Get(ctx context.Context, key string) GetResult {
 		return ret
 	}
 
-	for _, c := range c.cacheList {
-		getRet := c.GetFromCache(ctx, key)
-		ret.CacheName = c.GetName()
+	var writeBackList = make([]cache.CacheInterface, 0)
+	for _, cacheFind := range c.cacheList {
+		getRet := cacheFind.GetFromCache(ctx, key)
+		ret.CacheName = cacheFind.GetName()
 		if getRet.IsSuccess() {
-			ret.Err = nil
 			ret.FromCache = true
 			ret.Exist = getRet.Exist
 			ret.V = getRet.Value
+			ret.Err = c.doWriteBack(ctx, key, writeBackList, getRet.Value)
 			return ret
 		} else {
-			component.Logger.Errorf(ctx, "cache %s get failed, err: %v", c.GetName(), getRet.Err)
+			component.Logger.Errorf(ctx, "cache %s get failed, err: %v", cacheFind.GetName(), getRet.Err)
 			ret.Err = errors.Join(ret.Err, getRet.Err)
 		}
 
@@ -87,20 +89,23 @@ func (c *Chain) Get(ctx context.Context, key string) GetResult {
 			ret.Err = getRet.Err
 			return ret
 		case cache.HandleErrStrategyRetry:
-			getRet = c.RetryGetFromCache(ctx, key)
+			getRet = cacheFind.RetryGetFromCache(ctx, key)
 			if getRet.IsSuccess() {
-				ret.CacheName = c.GetName()
+				ret.CacheName = cacheFind.GetName()
 				ret.FromCache = true
 				ret.Exist = getRet.Exist
 				ret.V = getRet.Value
-				ret.Err = nil
+				ret.Err = c.doWriteBack(ctx, key, writeBackList, getRet.Value)
 				return ret
 			}
+		case cache.HandleErrStrategyWriteBack:
+			writeBackList = append(writeBackList, cacheFind)
 		}
 	}
 
 	return ret
 }
+
 func (c *Chain) BatchGet(ctx context.Context, keyList []string) map[string]GetResult {
 	ret := make(map[string]GetResult)
 
@@ -113,27 +118,35 @@ func (c *Chain) BatchGet(ctx context.Context, keyList []string) map[string]GetRe
 		return ret
 	}
 
-	for _, c := range c.cacheList {
-		getRetMap := c.BatchGetFromCache(ctx, keyList)
+	writeBackMap := make(map[string][]cache.CacheInterface)
+
+	for _, cacheFind := range c.cacheList {
+		getRetMap := cacheFind.BatchGetFromCache(ctx, keyList)
 		keyList = make([]string, 0, len(keyList))
 		for key, getRet := range getRetMap {
 			if getRet.IsSuccess() {
 				ret[key] = GetResult{
-					CacheName: c.GetName(),
+					CacheName: cacheFind.GetName(),
 					ErrHelper: helper.ErrHelper{Err: nil},
 					FromCache: true,
 					Exist:     getRet.Exist,
 					V:         getRet.Value,
 				}
+
+				if writeBackList, ok := writeBackMap[key]; ok {
+					temp := ret[key]
+					temp.ErrHelper.Err = c.doWriteBack(ctx, key, writeBackList, getRet.Value)
+					ret[key] = temp
+				}
 				continue
 			} else {
-				component.Logger.Errorf(ctx, "cache %s get failed, err: %v", c.GetName(), getRet.Err)
+				component.Logger.Errorf(ctx, "cache %s get failed, err: %v", cacheFind.GetName(), getRet.Err)
 				var preErr error
 				if _, ok := ret[key]; ok {
 					preErr = ret[key].Err
 				}
 				ret[key] = GetResult{
-					CacheName: c.GetName(),
+					CacheName: cacheFind.GetName(),
 					ErrHelper: helper.ErrHelper{Err: errors.Join(preErr, getRet.Err)},
 					FromCache: false,
 					Exist:     false,
@@ -146,23 +159,25 @@ func (c *Chain) BatchGet(ctx context.Context, keyList []string) map[string]GetRe
 				keyList = append(keyList, key)
 			case cache.HandleErrStrategyBreak:
 				ret[key] = GetResult{
-					CacheName: c.GetName(),
+					CacheName: cacheFind.GetName(),
 					ErrHelper: helper.ErrHelper{Err: getRet.Err},
 					FromCache: false,
 					Exist:     false,
 					V:         "",
 				}
 			case cache.HandleErrStrategyRetry:
-				getRet = c.RetryGetFromCache(ctx, key)
+				getRet = cacheFind.RetryGetFromCache(ctx, key)
 				if getRet.IsSuccess() {
 					ret[key] = GetResult{
-						CacheName: c.GetName(),
+						CacheName: cacheFind.GetName(),
 						ErrHelper: helper.ErrHelper{Err: nil},
 						FromCache: true,
 						Exist:     getRet.Exist,
 						V:         getRet.Value,
 					}
 				}
+			case cache.HandleErrStrategyWriteBack:
+				writeBackMap[key] = append(writeBackMap[key], cacheFind)
 			}
 		}
 	}
@@ -356,4 +371,16 @@ func (c *Chain) BatchClear(ctx context.Context, keyList []string) map[string]Cle
 	}
 
 	return ret
+}
+
+func (c *Chain) doWriteBack(ctx context.Context, key string, cacheList []cache.CacheInterface, value string) error {
+	for _, c := range cacheList {
+		setRet := c.SetCache(ctx, key, value)
+		if !setRet.IsSuccess() {
+			return setRet.Err
+		}
+	}
+
+	return nil
+
 }

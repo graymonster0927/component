@@ -34,7 +34,6 @@ type redisGetResult struct {
 }
 
 type RedisCacheOption func(*options)
-type RedisCacheType int
 
 type options struct {
 	expireTime     int

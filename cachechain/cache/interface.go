@@ -26,6 +26,9 @@ const (
 
 	// HandleErrStrategyBreak 中断
 	HandleErrStrategyBreak HandleErrStrategy = iota
+
+	// HandleErrStrategyWriteBack 回写
+	HandleErrStrategyWriteBack HandleErrStrategy = iota
 )
 
 type GetCacheResult struct {

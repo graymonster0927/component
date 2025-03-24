@@ -1,12 +1,19 @@
 ## 链式缓存
 
+> ** 可以单独用redis旁路缓存  当做分布式缓存 **
+
 CacheChain 是一个Go语言编写的链式缓存管理库，提供灵活且可扩展的接口，用于管理多级缓存层。通过该库，开发者可以轻松地与多种缓存后端（如内存缓存、Redis等）进行交互，执行缓存的 Get、Set、Clear 等操作，并具备错误处理和重试机制。
 
 ### 特征
+ * 实现redis旁路缓存, 支持pipeline批量获取数据, 保证缓存和DB一致性
  * 链式缓存：支持多层缓存链。当一个缓存层获取数据失败时，会自动尝试从下一个缓存层获取。
  * 错误处理策略：支持多种错误处理策略（Continue、Break、Retry），开发者可以根据不同的缓存层配置不同的处理方式。
  * 灵活扩展：可轻松集成多个缓存后端，并根据需要添加新的缓存层。
- * 已实现redis缓存, redis缓存支持pipeline批量获取数据, 实现旁路缓存, 保证缓存和DB一致性
+
+
+### 场景
+ * 单独用redis旁路缓存, 当做分布式缓存的场景
+ * memory + redis, 对redis前面加一层内存缓存, 适合qps非常高, 且能够接受数据适当延迟修改的场景
 
 ### 安装
 
@@ -46,7 +53,7 @@ go get github.com/graymonster0927/component
 	getRet := chain.Get(ctx, telephone)
     if !getRet.IsSuccess() {
         //缓存异常 直接不走缓存拿数据
-        //return fn()
+        return fn()
         //....
     }
 
