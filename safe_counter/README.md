@@ -1,4 +1,4 @@
-# SafeCounter 线程安全计数器
+# SafeCounter 全局计数器
 
 `safecounter` 包提供了一个安全的计数器实现，可用于在并发环境中对键值进行计数操作。
 
