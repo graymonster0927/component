@@ -3,7 +3,7 @@ package taskpool
 import (
 	"context"
 	"errors"
-	"github.com/panjf2000/ants/v2"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -51,10 +51,13 @@ func (t *TaskPool) SetGPoolSize(size int) {
 	gPoolSize = size
 }
 
-func (t *TaskPool) SetTaskHandler(taskType TaskType, fn func(ctx context.Context, params map[string]interface{}) (interface{}, error)) {
+func (t *TaskPool) SetTaskHandlerFunc(taskType TaskType, fn func(ctx context.Context, params map[string]interface{}) (interface{}, error)) {
 	t.fn[taskType] = fn
 }
 
+func (t *TaskPool) SetTaskHandler(taskHandler TaskHandlerI) {
+	t.fn[taskHandler.GetTaskType()] = taskHandler.GetTaskFn()
+}
 func (t *TaskPool) AddTask(taskType TaskType, label string, params map[string]interface{}) {
 	t.taskList = append(t.taskList, &task{
 		taskType: taskType,
@@ -138,6 +141,15 @@ func (t *TaskPool) GetRetList() map[string]interface{} {
 
 func (t *TaskPool) GetErrList() map[string]error {
 	return t.errList
+}
+
+func (t *TaskPool) FirstErr() error {
+	for key, err := range t.errList {
+		if err != nil {
+			return errors.New(fmt.Sprintf("key %s : %s", key, err.Error()))
+		}
+	}
+	return nil
 }
 
 func (t *TaskPool) Clear(ctx context.Context) {

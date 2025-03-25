@@ -33,18 +33,18 @@ func main() {
 	//设置协程池大小
     taskPool.SetGPoolSize(100)
 	//设置任务池的任务处理函数
-	taskPool.SetTaskHandler(TaskTypeDemo1, func(ctx *context.Context, params map[string]interface{}) (interface{}, error) {
+	taskPool.SetTaskHandlerFunc(TaskTypeDemo1, func(ctx *context.Context, params map[string]interface{}) (interface{}, error) {
 		fmt.Println("demo1")
 		return nil, nil
 	})
-
+ex
 	say := "my name is a"
-	taskPool.SetTaskHandler(TaskTypeDemo2, func(ctx *context.Context, params map[string]interface{}) (interface{}, error) {
+	taskPool.SetTaskHandlerFunc(TaskTypeDemo2, func(ctx *context.Context, params map[string]interface{}) (interface{}, error) {
 		fmt.Println(say)
 		return nil, nil
 	})
 
-	taskPool.SetTaskHandler(TaskTypeDemo3, func(ctx *context.Context, params map[string]interface{}) (interface{}, error) {
+	taskPool.SetTaskHandlerFunc(TaskTypeDemo3, func(ctx *context.Context, params map[string]interface{}) (interface{}, error) {
 		p1 := params["p1"].(string)
 		p2 := params["p2"].(int)
 		fmt.Println(p1, p2)
@@ -81,6 +81,23 @@ func main() {
 
 ```
 
+type TaskHandlerDemo struct {
+}
+
+func (t *TaskHandlerDemo) GetTaskType() TaskType {
+	return TaskTypeDemo3
+}
+
+func (t *TaskHandlerDemo) GetTaskFn() func(ctx context.Context, params map[string]interface{}) (interface{}, error) {
+	
+	return func(ctx context.Context, params map[string]interface{}) (interface{}, error) {
+		p1 := params["p1"].(int)
+		fmt.Println(p1+"port is scanning")
+		return nil, nil
+	}
+}
+
+
 const (
 	TaskTypeDemo3 TaskType = 3
 )
@@ -91,11 +108,7 @@ func main() {
 	taskPool := GetTaskPool(&ctx)
 
 	//设置任务池的任务处理函数
-	taskPool.SetTaskHandler(TaskTypeDemo3, func(ctx *context.Context, params map[string]interface{}) (interface{}, error) {
-		p1 := params["p1"].(int)
-		fmt.Println(p1+"port is scanning")
-		return nil, nil
-	})
+	taskPool.SetTaskHandler(&TaskHandlerDemo{})
 
 	//添加任务
     for i := 0; i < 65535; i++ {
